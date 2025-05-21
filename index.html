@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Document Summarizer & Analyzer</title>
+  <!-- TensorFlow.js for the ML model (utility) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js"></script>
+  <!-- Chart.js for visualizations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <!-- D3.js for advanced visualizations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <!-- PapaParse for CSV handling -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- SheetJS for Excel file handling -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Add PDF.js if you want PDF support:
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js';</script>
+  -->
+  <style>
+    :root {
+      --primary: #4361ee;
+      --primary-light: #4cc9f0;
+      --secondary: #3a0ca3;
+      --accent: #f72585;
+      --background: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #212529;
+      --text-light: #6c757d;
+      --border: #dee2e6;
+      --success: #198754;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #0dcaf0;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --radius: 8px;
+      --transition: all 0.3s ease;
+    }
+
+    .dark-theme {
+      --primary: #4e75f5; /* Adjusted for dark */
+      --primary-light: #5cd1f7; /* Adjusted for dark */
+      --secondary: #8c52ff; /* Adjusted for dark */
+      --accent: #f94aa4; /* Adjusted for dark */
+      --background: #121212;
+      --card-bg: #1e1e1e;
+      --text: #e9ecef;
+      --text-light: #adb5bd;
+      --border: #343a40;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      transition: var(--transition);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1300px; /* Slightly wider for more content */
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem; /* Reduced margin */
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo h1 {
+      color: var(--primary);
+      font-size: 1.5rem;
+      margin: 0;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--primary);
+      color: white;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    .theme-toggle {
+      background-color: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 1.5rem; /* Larger icon */
+      transition: var(--transition);
+      padding: 0.25rem;
+    }
+
+    .theme-toggle:hover {
+      color: var(--primary);
+      transform: scale(1.1);
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr; /* Adjusted column ratio */
+      gap: 1.5rem;
+    }
+
+    .left-panel, .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      transition: var(--transition);
+      overflow: hidden; /* Prevent content overflow issues */
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem; /* Added padding */
+      border-bottom: 1px solid var(--border); /* Separator */
+    }
+
+    .card-title {
+      font-size: 1.1rem; /* Slightly smaller */
+      color: var(--text);
+      font-weight: 600;
+      margin: 0;
+    }
+
+    textarea, input[type="text"], input[type="range"], select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background-color: var(--card-bg); /* Changed from --background */
+      color: var(--text);
+      font-family: inherit;
+      font-size:0.9rem;
+      transition: var(--transition);
+    }
+    textarea { resize: vertical; }
+
+
+    textarea:focus, input[type="text"]:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 67, 97, 238), 0.25); /* Use CSS var for color */
+    }
+    /* For primary-rgb definition */
+    :root { --primary-rgb: 67, 97, 238; }
+    .dark-theme { --primary-rgb: 78, 117, 245; }
+
+
+    .textarea-container {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+
+    .word-count {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 0.5rem;
+      font-size: 0.75rem; /* Smaller */
+      color: var(--text-light);
+      background-color: var(--card-bg);
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 0.75rem; /* Increased gap */
+      margin-top: 1rem;
+      flex-wrap: wrap; /* Allow wrapping on small screens */
+    }
+
+    button {
+      padding: 0.6rem 1.2rem; /* Adjusted padding */
+      border: none;
+      border-radius: var(--radius);
+      background-color: var(--primary);
+      color: white;
+      font-weight: 500; /* Normal weight */
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.9rem;
+    }
+
+    button:hover:not(:disabled) {
+      opacity: 0.85;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(var(--primary-rgb, 67, 97, 238), 0.2);
+    }
+    button:disabled {
+      background-color: var(--text-light);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .btn-secondary { background-color: var(--secondary); }
+    .btn-accent { background-color: var(--accent); }
+    .btn-outline {
+      background-color: transparent;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+    .btn-outline:hover:not(:disabled) {
+      background-color: var(--primary);
+      color: white;
+    }
+    .btn-sm {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.25rem; /* Reduced gap */
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .tab {
+      padding: 0.5rem 0.75rem; /* Adjusted padding */
+      border-radius: var(--radius) var(--radius) 0 0; /* Top radius only */
+      cursor: pointer;
+      transition: var(--transition);
+      color: var(--text-light);
+      font-weight: 500;
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+      border-bottom: none; /* Remove bottom border for inactive */
+    }
+
+    .tab:hover {
+      color: var(--primary);
+      background-color: rgba(var(--primary-rgb, 67, 97, 238), 0.05);
+    }
+
+    .tab.active {
+      color: var(--primary);
+      background-color: var(--card-bg); /* Match card background */
+      font-weight: 600;
+      border-color: var(--border);
+      border-bottom-color: var(--card-bg); /* Hide bottom border part */
+      position: relative;
+      top: 1px; /* Align with content area */
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .settings-label { display: flex; flex-direction: column; }
+    .settings-label span { font-size: 0.75rem; color: var(--text-light); margin-top: 0.2rem; }
+    .settings-label label { font-weight: 500; }
+
+
+    .slider-container { display: flex; align-items: center; gap: 0.5rem; width: 50%; }
+
+    .range-slider {
+      -webkit-appearance: none; width: 100%; height: 8px;
+      background: var(--border); border-radius: 4px; outline: none;
+      padding: 0; /* Remove default padding */
+    }
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--primary); cursor: pointer;
+      border: 2px solid var(--card-bg); /* Border for thumb */
+    }
+    .range-slider::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%; /* Adjusted for Firefox */
+      background: var(--primary); cursor: pointer; border: 2px solid var(--card-bg);
+    }
+    #summary-length-value, #key-concepts-value { font-size: 0.9rem; min-width: 30px; text-align: right; }
+
+
+    .badge {
+      display: inline-block; padding: 0.3rem 0.6rem;
+      border-radius: var(--radius); font-size: 0.75rem;
+      font-weight: 500; color: white; margin-right: 0.3rem; margin-bottom: 0.3rem;
+    }
+    .badge-primary { background-color: var(--primary); }
+    .badge-secondary { background-color: var(--secondary); }
+    .badge-accent { background-color: var(--accent); }
+    .badge-success { background-color: var(--success); }
+    .badge-warning { background-color: var(--warning); color: #212529; }
+    .badge-danger { background-color: var(--danger); }
+    .badge-info { background-color: var(--info); color: #212529; }
+
+    .summary-container { position: relative; margin-bottom: 1rem; }
+    .summary-content {
+      white-space: pre-wrap; line-height: 1.7; font-size: 0.95rem;
+      max-height: 300px; overflow-y: auto; padding: 0.5rem;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background-color: rgba(var(--primary-rgb), 0.02);
+    }
+    .dark-theme .summary-content { background-color: rgba(var(--primary-rgb), 0.05); }
+
+    .summary-actions {
+      display:flex; gap: 0.5rem; margin-top:0.5rem; justify-content: flex-end;
+      /* Removed absolute positioning, buttons are now below summary */
+    }
+
+
+    .key-concepts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+    .file-drop {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 1.5rem; text-align: center; cursor: pointer; transition: var(--transition);
+      background-color: rgba(var(--primary-rgb), 0.02);
+    }
+    .file-drop:hover { border-color: var(--primary); background-color: rgba(var(--primary-rgb), 0.05); }
+    .file-drop.drag-over { border-color: var(--primary); background-color: rgba(var(--primary-rgb), 0.1); transform: scale(1.02); }
+    .file-drop-icon { font-size: 2.5rem; color: var(--text-light); margin-bottom: 0.5rem; display:block; }
+    .file-input { display: none; }
+
+    .loading-container, .placeholder-message {
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; padding: 2rem; text-align: center; color: var(--text-light);
+      min-height: 150px; /* Ensure some height */
+    }
+    .placeholder-message { font-style: italic; }
+
+    .loading-spinner {
+      width: 40px; height: 40px; border: 4px solid rgba(var(--primary-rgb), 0.2);
+      border-left-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 1rem;
+    }
+
+    .progress-bar {
+      width: 100%; height: 10px; background-color: var(--border);
+      border-radius: 5px; overflow: hidden; margin-top: 1rem;
+    }
+    .progress-bar-fill {
+      height: 100%; background-color: var(--primary);
+      border-radius: 5px; transition: width 0.3s ease;
+    }
+
+    .tooltip { position: relative; display: inline-block; }
+    .tooltip .tooltip-text {
+      visibility: hidden; min-width: 140px; background-color: var(--secondary);
+      color: white; text-align: center; border-radius: var(--radius);
+      padding: 0.5rem 0.75rem; position: absolute; z-index: 10;
+      bottom: 130%; left: 50%; transform: translateX(-50%);
+      opacity: 0; transition: opacity 0.3s; box-shadow: var(--shadow);
+      font-size: 0.8rem; white-space: nowrap;
+    }
+    .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+    .info-tooltip { cursor: help; color: var(--text-light); margin-left: 0.25rem; font-size: 0.9rem; }
+
+
+    #entity-chart-container, #visualization-container {
+      width: 100%;
+      min-height: 250px; /* Ensure chart has space */
+      margin-top: 1rem;
+      position: relative; /* For loading overlays if needed */
+    }
+    #entity-chart { width: 100% !important; height: 250px !important; } /* Force Chart.js size */
+
+
+    .highlighted { background-color: rgba(var(--warning-rgb, 255, 193, 7), 0.4); border-radius: 3px; padding: 0 3px; }
+    :root { --warning-rgb: 255, 193, 7; }
+    .dark-theme { --warning-rgb: 255, 193, 7; } /* Keep warning similar for dark */
+
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .search-container { position: relative; margin-bottom: 1rem; }
+    .search-input { padding-right: 2.5rem; } /* Space for icon */
+    .search-icon {
+      position: absolute; right: 0.75rem; top: 50%;
+      transform: translateY(-50%); color: var(--text-light);
+      cursor: pointer; font-size: 1.1rem;
+    }
+    .search-icon:hover { color: var(--primary); }
+
+    .search-results { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
+    .result-item {
+      padding: 0.6rem; border-radius: var(--radius);
+      cursor: pointer; transition: var(--transition); margin-bottom: 0.25rem;
+      border: 1px solid transparent; font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .result-item:hover { background-color: rgba(var(--primary-rgb), 0.1); border-color: rgba(var(--primary-rgb), 0.2); }
+    .result-item.active { background-color: rgba(var(--primary-rgb), 0.15); border-color: var(--primary); font-weight: 500; }
+    .result-item mark { background-color: var(--warning); color: var(--text); padding: 1px 2px; border-radius: 2px; }
+
+
+    .hide { display: none !important; }
+
+    .footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 2rem; padding: 1.5rem 0; border-top: 1px solid var(--border);
+      font-size: 0.85rem; color: var(--text-light);
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+
+
+    .entity {
+      padding: 3px 6px; margin: 2px; border-radius: 4px;
+      font-weight: 500; cursor: default; display: inline-block;
+      border: 1px solid transparent;
+      font-size: 0.85rem;
+    }
+    /* Using more distinct entity colors */
+    .entity-PERSON { background-color: rgba(76, 175, 80, 0.15); border-color: rgba(76, 175, 80, 0.4); color: #1b5e20; }
+    .entity-ORG { background-color: rgba(33, 150, 243, 0.15); border-color: rgba(33, 150, 243, 0.4); color: #0d47a1; }
+    .entity-DATE { background-color: rgba(255, 152, 0, 0.15); border-color: rgba(255, 152, 0, 0.4); color: #e65100; }
+    .entity-LOC { background-color: rgba(123, 31, 162, 0.15); border-color: rgba(123, 31, 162, 0.4); color: #4a148c; }
+    .entity-MISC { background-color: rgba(96, 125, 139, 0.15); border-color: rgba(96, 125, 139, 0.4); color: #263238; }
+    .dark-theme .entity-PERSON { color: #c8e6c9; }
+    .dark-theme .entity-ORG { color: #b3e5fc; }
+    .dark-theme .entity-DATE { color: #ffecb3; }
+    .dark-theme .entity-LOC { color: #e1bee7; }
+    .dark-theme .entity-MISC { color: #cfd8dc; }
+
+
+    .pulse { animation: pulse 1.5s infinite ease-in-out; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    .upload-list { margin-top: 1rem; }
+    .upload-item {
+      display: flex; align-items: center; padding: 0.75rem;
+      border-radius: var(--radius); border: 1px solid var(--border);
+      margin-bottom: 0.5rem; background-color: var(--card-bg);
+    }
+    .upload-item-icon { margin-right: 0.75rem; color: var(--primary); font-size: 1.2rem; }
+    .upload-item-name {
+      flex-grow: 1; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; font-size: 0.9rem;
+    }
+    .upload-item-size { color: var(--text-light); font-size: 0.8rem; margin-left: 0.5rem; }
+    .upload-item-actions { margin-left: 0.5rem; }
+    .upload-item-actions button { padding: 0.2rem 0.4rem; font-size: 0.7rem; }
+
+
+    .history-list { max-height: 200px; overflow-y: auto; }
+    .history-item {
+      padding: 0.75rem; border-radius: var(--radius);
+      border: 1px solid var(--border); margin-bottom: 0.5rem;
+      cursor: pointer; transition: var(--transition);
+      background-color: var(--card-bg);
+    }
+    .history-item:hover { border-color: var(--primary); background-color: rgba(var(--primary-rgb), 0.05); }
+    .history-item-header { display: flex; justify-content: space-between; margin-bottom: 0.25rem; align-items: center; }
+    .history-item-title {
+      font-weight: 500; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 60%; font-size: 0.9rem;
+    }
+    .history-item-date { font-size: 0.75rem; color: var(--text-light); }
+    .history-item-preview {
+      font-size: 0.8rem; color: var(--text-light);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .history-item-actions button { margin-left: 0.5rem; }
+
+
+    #insights-container { min-height: 100px; }
+    .insight-item { margin-bottom: 0.75rem; }
+    .insight-item strong { color: var(--primary); }
+
+    /* Make select elements consistent */
+    select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23333' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      background-size: 1em;
+      padding-right: 2.5rem; /* Make space for arrow */
+    }
+    .dark-theme select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23DDD' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    }
+
+
+    @media (max-width: 992px) { /* Tablet */
+      .app-container { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) { /* Mobile */
+      .settings-row { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+      .slider-container { width: 100%; }
+      .button-container { justify-content: center; }
+      .tabs { flex-wrap: wrap; } /* Allow tabs to wrap */
+      .logo h1 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">✨</div>
+      <h1>AI Document Analyzer</h1>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">🌙</button>
+  </header>
+
+  <div id="loading-screen" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Initializing AI Analyzer...</p>
+    <div class="progress-bar">
+      <div id="progress-bar-fill" class="progress-bar-fill" style="width: 10%"></div>
+    </div>
+    <p style="font-size:0.8em; color: var(--text-light); margin-top:0.5em;">This may take a moment for the first run.</p>
+  </div>
+
+  <div id="app-main-container" class="app-container" style="display: none;">
+    <div class="left-panel">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Input Document</h2>
+          <div class="tooltip">
+            <span class="info-tooltip">ℹ️</span>
+            <span class="tooltip-text">Enter text or upload TXT, CSV, XLSX, HTML files. PDF limited.</span>
+          </div>
+        </div>
+
+        <div class="tabs" id="input-tabs">
+          <div class="tab active" data-tab="text-input-content">Text Input</div>
+          <div class="tab" data-tab="file-upload-content">File Upload</div>
+        </div>
+
+        <div id="text-input-content" class="tab-content active">
+          <div class="textarea-container">
+            <textarea id="document-input" rows="10" placeholder="Enter or paste your document text here..."></textarea>
+            <div id="word-count" class="word-count">0 words</div>
+          </div>
+        </div>
+
+        <div id="file-upload-content" class="tab-content">
+          <div id="file-drop" class="file-drop">
+            <div class="file-drop-icon">📤</div>
+            <p>Drag & drop files here or click to browse</p>
+            <p class="text-light" style="font-size:0.8em;">Supports: .txt, .csv, .xlsx, .html</p>
+            <input type="file" id="file-input" class="file-input" accept=".txt,.csv,.xlsx,.xls,.html" multiple>
+          </div>
+          <div id="upload-list" class="upload-list"></div>
+        </div>
+        <div class="button-container">
+          <button id="analyze-btn" class="btn-primary pulse">Analyze & Summarize</button>
+          <button id="clear-btn" class="btn-outline">Clear Input</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Analysis Settings</h2>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            <label for="summary-length">Summary Length (%)</label>
+            <span>Target percentage of original text</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="summary-length" class="range-slider" min="10" max="50" value="25">
+            <div id="summary-length-value">25%</div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            <label for="key-concepts-count">Key Concepts (Max)</label>
+            <span>Number of top concepts to extract</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="key-concepts-count" class="range-slider" min="3" max="10" value="5">
+            <div id="key-concepts-value">5</div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            <label for="summary-type">Summary Type</label>
+            <span>Choose summary generation method</span>
+          </div>
+          <select id="summary-type" style="width:50%;">
+            <option value="extractive">Extractive (Key Sentences)</option>
+            <option value="abstractive_simplified">"Abstractive" (Simplified)</option>
+            <option value="bullet_points">Bullet Points</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            <label>Analysis Options</label>
+            <span>Select additional analyses to perform</span>
+          </div>
+          <div>
+            <label style="font-weight:normal; font-size:0.9em;"><input type="checkbox" id="extract-entities" checked> Extract Named Entities</label><br>
+            <label style="font-weight:normal; font-size:0.9em;"><input type="checkbox" id="calculate-insights" checked> Calculate Document Insights</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">History</h2>
+          <button id="clear-history-btn" class="btn-outline btn-sm">Clear History</button>
+        </div>
+        <div id="history-container" class="history-list">
+          <p id="no-history" class="placeholder-message">No recent documents processed.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Analysis Results</h2>
+          <button id="export-results-btn" class="btn-outline btn-sm hide">Export All Results</button>
+        </div>
+
+        <div class="tabs" id="output-tabs">
+          <div class="tab active" data-tab="summary-content-tab">Summary</div>
+          <div class="tab" data-tab="entities-content-tab">Key Entities</div>
+          <div class="tab" data-tab="insights-content-tab">Insights</div>
+          <div class="tab" data-tab="search-content-tab">Search Document</div>
+        </div>
+
+        <div id="summary-content-tab" class="tab-content active">
+          <div id="summary-container" class="summary-container">
+            <div id="summary-output" class="summary-content">
+              <p class="placeholder-message">Your summary will appear here after analysis.</p>
+            </div>
+            <div class="summary-actions">
+              <button id="copy-summary-btn" class="btn-outline btn-sm hide">Copy Summary</button>
+              <button id="download-summary-btn" class="btn-outline btn-sm hide">Download Summary (.txt)</button>
+            </div>
+          </div>
+          <h3>Key Concepts</h3>
+          <div id="key-concepts-output" class="key-concepts">
+            <p class="placeholder-message" style="font-size:0.8em;">Extracted key concepts will be listed here.</p>
+          </div>
+        </div>
+
+        <div id="entities-content-tab" class="tab-content">
+          <div id="entities-output">
+            <p class="placeholder-message">Named entity extraction results will appear here.</p>
+          </div>
+          <div id="entity-chart-container" class="chart-container" style="margin-top: 1rem;">
+            <canvas id="entity-chart"></canvas>
+          </div>
+        </div>
+
+        <div id="insights-content-tab" class="tab-content">
+          <div id="insights-output">
+            <p class="placeholder-message">Document insights (readability, sentiment, etc.) will appear here.</p>
+          </div>
+        </div>
+
+        <div id="search-content-tab" class="tab-content">
+          <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Search within the original document...">
+            <span id="search-icon" class="search-icon">🔍</span>
+          </div>
+          <div id="search-results-output" class="search-results">
+            <p class="placeholder-message">Search results will be displayed here.</p>
+          </div>
+          <div id="search-navigation" class="button-container hide" style="margin-top:0.5rem; justify-content:flex-start;">
+            <button id="prev-match-btn" class="btn-sm btn-outline">Previous</button>
+            <span id="match-count" style="font-size:0.8em; margin: 0 0.5rem; align-self:center;">0/0</span>
+            <button id="next-match-btn" class="btn-sm btn-outline">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>© 2024 AI Document Analyzer Demo</div>
+    <div>Powered by TensorFlow.js, Chart.js, D3.js, PapaParse, SheetJS</div>
+  </div>
+</div>
+
+<script>
+  /**
+   * AI Document Summarizer & Analyzer
+   * A browser-based application for analyzing and summarizing text documents.
+   * Simplified AI logic for demonstration purposes.
+   */
+
+          // --- Application State ---
+  const state = {
+            isModelLoaded: false,
+            isProcessing: false,
+            currentDocumentText: null,
+            currentFileName: null,
+            analysisResults: {},
+            history: [],
+            darkMode: localStorage.getItem('docAnalyzerDarkMode') === 'true',
+            currentSearchTerm: '',
+            searchResultsIndices: [],
+            currentMatchIndex: -1,
+            entityChartInstance: null,
+            stopWords: new Set([ // Basic English stop words
+              "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
+              "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could",
+              "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during", "each", "few", "for",
+              "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's",
+              "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm",
+              "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't",
+              "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours",
+              "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so",
+              "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's",
+              "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until",
+              "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when",
+              "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would",
+              "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves",
+              // Common punctuation to remove if not handled by regex
+              ".", ",", ";", ":", "?", "!", "-", "_", "(", ")", "[", "]", "{", "}", "\"", "'", "`"
+            ]),
+            // Simplified sentiment lexicon
+            sentimentLexicon: {
+              positive: new Set(['amazing', 'awesome', 'good', 'great', 'happy', 'joy', 'love', 'nice', 'excellent', 'wonderful', 'positive', 'success', 'benefit', 'improve', 'efficient']),
+              negative: new Set(['bad', 'awful', 'terrible', 'sad', 'hate', 'angry', 'problem', 'issue', 'negative', 'fail', 'poor', 'difficult', 'risk', 'warn', 'error'])
+            }
+          };
+
+  // --- DOM Elements ---
+  const elements = {
+    loadingScreen: document.getElementById('loading-screen'),
+    appContainer: document.getElementById('app-main-container'),
+    progressBarFill: document.getElementById('progress-bar-fill'),
+    documentInput: document.getElementById('document-input'),
+    wordCount: document.getElementById('word-count'),
+    analyzeBtn: document.getElementById('analyze-btn'),
+    clearBtn: document.getElementById('clear-btn'),
+    fileDropArea: document.getElementById('file-drop'),
+    fileInput: document.getElementById('file-input'),
+    uploadList: document.getElementById('upload-list'),
+    summaryLengthSlider: document.getElementById('summary-length'),
+    summaryLengthValue: document.getElementById('summary-length-value'),
+    keyConceptsSlider: document.getElementById('key-concepts-count'),
+    keyConceptsValue: document.getElementById('key-concepts-value'),
+    summaryTypeSelect: document.getElementById('summary-type'),
+    extractEntitiesCheckbox: document.getElementById('extract-entities'),
+    calculateInsightsCheckbox: document.getElementById('calculate-insights'),
+    summaryOutput: document.getElementById('summary-output'),
+    keyConceptsOutput: document.getElementById('key-concepts-output'),
+    entitiesOutput: document.getElementById('entities-output'),
+    insightsOutput: document.getElementById('insights-output'),
+    entityChartCanvas: document.getElementById('entity-chart'),
+    copySummaryBtn: document.getElementById('copy-summary-btn'),
+    downloadSummaryBtn: document.getElementById('download-summary-btn'),
+    exportResultsBtn: document.getElementById('export-results-btn'),
+    searchInput: document.getElementById('search-input'),
+    searchIcon: document.getElementById('search-icon'),
+    searchResultsOutput: document.getElementById('search-results-output'),
+    searchNav: document.getElementById('search-navigation'),
+    prevMatchBtn: document.getElementById('prev-match-btn'),
+    nextMatchBtn: document.getElementById('next-match-btn'),
+    matchCountDisplay: document.getElementById('match-count'),
+    historyContainer: document.getElementById('history-container'),
+    noHistoryMsg: document.getElementById('no-history'),
+    clearHistoryBtn: document.getElementById('clear-history-btn'),
+    themeToggleBtn: document.getElementById('theme-toggle'),
+    inputTabsContainer: document.getElementById('input-tabs'),
+    outputTabsContainer: document.getElementById('output-tabs'),
+    textInputTabContent: document.getElementById('text-input-content'),
+    fileUploadTabContent: document.getElementById('file-upload-content'),
+    summaryTabContent: document.getElementById('summary-content-tab'),
+    entitiesTabContent: document.getElementById('entities-content-tab'),
+    insightsTabContent: document.getElementById('insights-content-tab'),
+    searchTabContent: document.getElementById('search-content-tab'),
+  };
+
+  // --- Utility Functions ---
+  const utils = {
+    debounce: (func, delay) => {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    },
+    formatFileSize: (bytes) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    showToast: (message, type = 'info') => { // Simple toast notification
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      // Basic styling for toast (add to <style> or a dedicated CSS if preferred)
+      const style = document.createElement('style');
+      style.innerHTML = `
+                    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                             padding: 10px 20px; border-radius: 5px; color: white; z-index: 9999;
+                             font-size: 0.9em; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity:0; transition: opacity 0.3s ease; }
+                    .toast-info { background-color: var(--primary); }
+                    .toast-success { background-color: var(--success); }
+                    .toast-error { background-color: var(--danger); }
+                    .toast.show { opacity:1; }
+                `;
+      document.head.appendChild(style);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    },
+    getSentences: (text) => {
+      // Basic sentence splitting. More robust NLP libraries would do better.
+      if (!text) return [];
+      return text.match(/[^.!?]+[.!?]+(\s|$)/g) || [text];
+    },
+    getWords: (text, removeStopWords = false) => {
+      if (!text) return [];
+      let words = text.toLowerCase().replace(/[^\w\s'-]|_/g, "").replace(/\s+/g, " ").trim().split(/\s+/);
+      if (removeStopWords) {
+        words = words.filter(word => !state.stopWords.has(word) && word.length > 1);
+      }
+      return words;
+    },
+    calculateWordFrequency: (words) => {
+      const freqMap = new Map();
+      words.forEach(word => freqMap.set(word, (freqMap.get(word) || 0) + 1));
+      return freqMap;
+    }
+  };
+
+  // --- UI Update Functions ---
+  const ui = {
+    toggleTheme: () => {
+      state.darkMode = !state.darkMode;
+      document.body.classList.toggle('dark-theme', state.darkMode);
+      elements.themeToggleBtn.textContent = state.darkMode ? '☀️' : '🌙';
+      localStorage.setItem('docAnalyzerDarkMode', state.darkMode);
+      // Re-render charts if they exist and need theme adjustment
+      if (state.entityChartInstance) {
+        setTimeout(() => { // Allow DOM to update
+          ai.renderEntityChart(state.analysisResults.entities || {});
+        }, 50);
+      }
+    },
+    updateProgressBar: (percentage) => {
+      elements.progressBarFill.style.width = `${percentage}%`;
+    },
+    showLoading: (isShowing, message = "Processing...") => {
+      state.isProcessing = isShowing;
+      elements.analyzeBtn.disabled = isShowing;
+      elements.analyzeBtn.innerHTML = isShowing ? `<div class="loading-spinner" style="width:18px; height:18px; border-width:2px; margin:0 auto;"></div>` : 'Analyze & Summarize';
+      if (isShowing) elements.analyzeBtn.classList.add('pulse');
+      else elements.analyzeBtn.classList.remove('pulse');
+      // Could add a more prominent overlay if needed
+    },
+    updateWordCount: () => {
+      const text = elements.documentInput.value;
+      const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+      elements.wordCount.textContent = `${wordCount} words`;
+    },
+    switchTab: (tabsContainer, tabContentsPrefix, clickedTab) => {
+      tabsContainer.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      clickedTab.classList.add('active');
+      const tabName = clickedTab.dataset.tab;
+      document.querySelectorAll(`.${tabContentsPrefix}`).forEach(content => {
+        content.classList.toggle('active', content.id === tabName);
+      });
+    },
+    displaySummary: (summaryText) => {
+      elements.summaryOutput.innerHTML = ''; // Clear previous
+      if (summaryText) {
+        const p = document.createElement('p');
+        p.textContent = summaryText;
+        elements.summaryOutput.appendChild(p);
+        elements.copySummaryBtn.classList.remove('hide');
+        elements.downloadSummaryBtn.classList.remove('hide');
+      } else {
+        elements.summaryOutput.innerHTML = '<p class="placeholder-message">No summary generated. Try adjusting settings or input text.</p>';
+        elements.copySummaryBtn.classList.add('hide');
+        elements.downloadSummaryBtn.classList.add('hide');
+      }
+    },
+    displayKeyConcepts: (concepts) => {
+      elements.keyConceptsOutput.innerHTML = '';
+      if (concepts && concepts.length > 0) {
+        concepts.forEach(concept => {
+          const badge = document.createElement('span');
+          badge.className = 'badge badge-secondary';
+          badge.textContent = concept;
+          elements.keyConceptsOutput.appendChild(badge);
+        });
+      } else {
+        elements.keyConceptsOutput.innerHTML = '<p class="placeholder-message" style="font-size:0.8em;">No key concepts extracted.</p>';
+      }
+    },
+    displayEntities: (entitiesMap) => { // entitiesMap = { TYPE: [entity1, entity2], ... }
+      elements.entitiesOutput.innerHTML = '';
+      if (entitiesMap && Object.keys(entitiesMap).length > 0) {
+        const fragment = document.createDocumentFragment();
+        for (const type in entitiesMap) {
+          if(entitiesMap[type].length > 0) {
+            const typeHeader = document.createElement('h4');
+            typeHeader.textContent = type.toUpperCase();
+            typeHeader.style.marginTop = "0.5rem";
+            typeHeader.style.fontSize = "0.9rem";
+            typeHeader.style.color = "var(--primary)";
+            fragment.appendChild(typeHeader);
+            entitiesMap[type].forEach(entityText => {
+              const span = document.createElement('span');
+              span.className = `entity entity-${type}`;
+              span.textContent = entityText;
+              fragment.appendChild(span);
+              fragment.appendChild(document.createTextNode(' ')); // Add space
+            });
+          }
+        }
+        elements.entitiesOutput.appendChild(fragment);
+      } else {
+        elements.entitiesOutput.innerHTML = '<p class="placeholder-message">No named entities extracted or extraction disabled.</p>';
+      }
+    },
+    displayInsights: (insights) => {
+      elements.insightsOutput.innerHTML = '';
+      if (insights && Object.keys(insights).length > 0) {
+        const ul = document.createElement('ul');
+        ul.style.listStyleType = 'none';
+        ul.style.paddingLeft = '0';
+
+        if (insights.readability) {
+          const li = document.createElement('li');
+          li.className = 'insight-item';
+          li.innerHTML = `<strong>Readability (Flesch):</strong> ${insights.readability.score.toFixed(1)} (${insights.readability.level})`;
+          ul.appendChild(li);
+        }
+        if (insights.sentiment) {
+          const li = document.createElement('li');
+          li.className = 'insight-item';
+          li.innerHTML = `<strong>Overall Sentiment:</strong> ${insights.sentiment.label} (Score: ${insights.sentiment.score.toFixed(2)})`;
+          ul.appendChild(li);
+        }
+        if (insights.stats) {
+          const li = document.createElement('li');
+          li.className = 'insight-item';
+          li.innerHTML = `<strong>Statistics:</strong> ${insights.stats.wordCount} words, ${insights.stats.sentenceCount} sentences, ~${insights.stats.avgWordsPerSentence.toFixed(1)} words/sentence.`;
+          ul.appendChild(li);
+        }
+        if (insights.topKeywords && insights.topKeywords.length > 0) {
+          const li = document.createElement('li');
+          li.className = 'insight-item';
+          li.innerHTML = `<strong>Top Keywords:</strong> ${insights.topKeywords.slice(0,5).join(', ')}`;
+          ul.appendChild(li);
+        }
+        elements.insightsOutput.appendChild(ul);
+      } else {
+        elements.insightsOutput.innerHTML = '<p class="placeholder-message">No document insights calculated or calculation disabled.</p>';
+      }
+    },
+    displaySearchResults: (results) => {
+      elements.searchResultsOutput.innerHTML = '';
+      state.searchResultsIndices = [];
+      if (results && results.length > 0) {
+        results.forEach(result => {
+          const item = document.createElement('div');
+          item.className = 'result-item';
+          item.innerHTML = result.context; // context already has <mark>
+          item.onclick = () => {
+            ui.highlightOriginalText(result.startIndex, result.endIndex);
+            // Optionally, make this search result active
+            document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+          };
+          elements.searchResultsOutput.appendChild(item);
+          state.searchResultsIndices.push({start: result.startIndex, end: result.endIndex});
+        });
+        elements.searchNav.classList.remove('hide');
+        state.currentMatchIndex = 0;
+        ui.updateSearchNav();
+        ui.navigateToMatch(0);
+
+      } else if (state.currentSearchTerm) {
+        elements.searchResultsOutput.innerHTML = '<p class="placeholder-message">No matches found.</p>';
+        elements.searchNav.classList.add('hide');
+      } else {
+        elements.searchResultsOutput.innerHTML = '<p class="placeholder-message">Search results will be displayed here.</p>';
+        elements.searchNav.classList.add('hide');
+      }
+    },
+    highlightOriginalText: (startIndex, endIndex) => {
+      elements.documentInput.focus();
+      try { // Some browsers might not support all select features on textarea
+        elements.documentInput.setSelectionRange(startIndex, endIndex);
+      } catch (e) { console.warn("Text selection not fully supported in this browser for textarea."); }
+
+      // Scroll to selection - tricky for textarea, might need a div overlay if precise scroll is needed
+      const text = elements.documentInput.value;
+      const textToSelection = text.substring(0, startIndex);
+      const lines = textToSelection.split('\n').length;
+      // Approximate scroll, as line heights can vary
+      elements.documentInput.scrollTop = (lines - 5) * 15; // Assuming ~15px per line, show a bit above
+    },
+    updateSearchNav: () => {
+      if (state.searchResultsIndices.length > 0) {
+        elements.matchCountDisplay.textContent = `${state.currentMatchIndex + 1}/${state.searchResultsIndices.length}`;
+        elements.prevMatchBtn.disabled = state.currentMatchIndex === 0;
+        elements.nextMatchBtn.disabled = state.currentMatchIndex === state.searchResultsIndices.length - 1;
+      } else {
+        elements.matchCountDisplay.textContent = '0/0';
+      }
+    },
+    navigateToMatch: (index) => {
+      if (index >= 0 && index < state.searchResultsIndices.length) {
+        state.currentMatchIndex = index;
+        const match = state.searchResultsIndices[index];
+        ui.highlightOriginalText(match.start, match.end);
+        // Highlight in results list
+        const resultItems = elements.searchResultsOutput.querySelectorAll('.result-item');
+        resultItems.forEach(item => item.classList.remove('active'));
+        if(resultItems[index]) resultItems[index].classList.add('active');
+
+        ui.updateSearchNav();
+      }
+    },
+    renderHistory: () => {
+      elements.historyContainer.innerHTML = ''; // Clear
+      if (state.history.length === 0) {
+        elements.noHistoryMsg.classList.remove('hide');
+        return;
+      }
+      elements.noHistoryMsg.classList.add('hide');
+      const ul = document.createElement('ul');
+      ul.style.listStyleType = 'none';
+      ul.style.paddingLeft = '0';
+      state.history.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        li.innerHTML = `
+                        <div class="history-item-header">
+                            <span class="history-item-title">${item.name || 'Pasted Text'}</span>
+                            <span class="history-item-date">${new Date(item.timestamp).toLocaleDateString()}</span>
+                        </div>
+                        <p class="history-item-preview">${item.text.substring(0, 100)}...</p>
+                    `;
+        li.onclick = () => handlers.loadFromHistory(index);
+        ul.appendChild(li);
+      });
+      elements.historyContainer.appendChild(ul);
+    },
+    updateFileUploadList: (files) => {
+      elements.uploadList.innerHTML = '';
+      if (!files || files.length === 0) return;
+
+      Array.from(files).forEach(file => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'upload-item';
+        itemDiv.innerHTML = `
+                        <span class="upload-item-icon">📄</span>
+                        <div class="upload-item-name" title="${file.name}">${file.name}</div>
+                        <div class="upload-item-size">${utils.formatFileSize(file.size)}</div>
+                    `;
+        elements.uploadList.appendChild(itemDiv);
+      });
+    },
+    resetOutputs: () => {
+      ui.displaySummary('');
+      ui.displayKeyConcepts([]);
+      ui.displayEntities({});
+      ai.renderEntityChart({}); // Clear chart
+      ui.displayInsights({});
+      elements.searchResultsOutput.innerHTML = '<p class="placeholder-message">Search results will be displayed here.</p>';
+      elements.searchNav.classList.add('hide');
+      elements.searchInput.value = '';
+      state.currentSearchTerm = '';
+      state.searchResultsIndices = [];
+      state.currentMatchIndex = -1;
+      elements.exportResultsBtn.classList.add('hide');
+    }
+  };
+
+  // --- "AI" & Processing Logic ---
+  const ai = {
+    // Simplified TextRank-like summarization
+    extractiveSummarize: (text, percentage = 0.25) => {
+      const sentences = utils.getSentences(text);
+      if (sentences.length === 0) return "";
+      const numSentencesToReturn = Math.max(1, Math.ceil(sentences.length * percentage));
+
+      const wordsInSentences = sentences.map(s => utils.getWords(s, true));
+      const allWords = wordsInSentences.flat();
+      const wordFreq = utils.calculateWordFrequency(allWords);
+
+      const sentenceScores = sentences.map((sentence, i) => {
+        let score = 0;
+        wordsInSentences[i].forEach(word => {
+          score += (wordFreq.get(word) || 0);
+        });
+        // Add a small bonus for sentences earlier in the text
+        score /= (Math.max(1, wordsInSentences[i].length)); // Normalize by sentence length
+        score *= (1 - (i / sentences.length) * 0.2); // Position bonus
+        return { sentence, score, originalIndex: i };
+      });
+
+      sentenceScores.sort((a, b) => b.score - a.score);
+      const topSentences = sentenceScores.slice(0, numSentencesToReturn);
+      topSentences.sort((a, b) => a.originalIndex - b.originalIndex); // Sort back to original order
+
+      return topSentences.map(s => s.sentence.trim()).join(' ');
+    },
+    // Very simplified "abstractive" - more like keyword-focused extractive
+    abstractiveSimplifiedSummarize: (text, percentage = 0.25) => {
+      // For this demo, it's similar to extractive but might try to pick sentences with more diverse important words
+      const sentences = utils.getSentences(text);
+      if (sentences.length === 0) return "";
+      const numSentencesToReturn = Math.max(1, Math.ceil(sentences.length * percentage));
+
+      const concepts = ai.extractKeyConcepts(text, 10).map(c => c.toLowerCase()); // Get more concepts initially
+
+      const sentenceScores = sentences.map((sentence, i) => {
+        let score = 0;
+        const sentenceWords = utils.getWords(sentence.toLowerCase(), true);
+        let conceptMatches = 0;
+        concepts.forEach(concept => {
+          if (sentence.toLowerCase().includes(concept) || sentenceWords.includes(concept)) {
+            score += 2; // Higher score for concept match
+            conceptMatches++;
+          }
+        });
+        // Add score for general important words as well
+        sentenceWords.forEach(word => {
+          if (state.wordFrequencies && state.wordFrequencies.get(word) > 1) score += 0.5;
+        });
+        score *= (1 + conceptMatches * 0.1); // Bonus for more distinct concepts
+        return { sentence, score, originalIndex: i };
+      });
+
+      sentenceScores.sort((a, b) => b.score - a.score);
+      const topSentences = sentenceScores.slice(0, numSentencesToReturn);
+      topSentences.sort((a, b) => a.originalIndex - b.originalIndex);
+      return topSentences.map(s => s.sentence.trim()).join(' ');
+    },
+    bulletPointSummarize: (text, numBullets = 5) => {
+      const sentences = utils.getSentences(text);
+      if (sentences.length === 0) return "";
+      // Use similar scoring to extractive to find important sentences
+      const wordsInSentences = sentences.map(s => utils.getWords(s, true));
+      const allWords = wordsInSentences.flat();
+      const wordFreq = utils.calculateWordFrequency(allWords);
+      state.wordFrequencies = wordFreq; // Save for abstractive
+
+      const sentenceScores = sentences.map((sentence, i) => {
+        let score = 0;
+        wordsInSentences[i].forEach(word => score += (wordFreq.get(word) || 0));
+        score /= (Math.max(1, wordsInSentences[i].length));
+        return { sentence, score, originalIndex: i };
+      });
+
+      sentenceScores.sort((a, b) => b.score - a.score);
+      const topSentences = sentenceScores.slice(0, Math.min(numBullets, sentences.length));
+      // No need to sort back to original order for bullet points usually
+      return topSentences.map(s => `• ${s.sentence.trim()}`).join('\n');
+    },
+    extractKeyConcepts: (text, count = 5) => {
+      const words = utils.getWords(text, true); // Get content words
+      if (words.length === 0) return [];
+      const wordFreq = utils.calculateWordFrequency(words);
+
+      // A simple approach: top N most frequent words (excluding very short ones)
+      const sortedConcepts = Array.from(wordFreq.entries())
+              .filter(([word, freq]) => word.length > 2) // Min length for a concept
+              .sort(([, freqA], [, freqB]) => freqB - freqA);
+
+      return sortedConcepts.slice(0, count).map(([word]) => word);
+    },
+    // Basic regex-based NER
+    extractEntities: (text) => {
+      const entities = { PERSON: [], ORG: [], DATE: [], LOC: [], MISC: [] };
+      // Dates (simple ISO or common US format)
+      const dateRegex = /\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s\d{1,2}(?:st|nd|rd|th)?(?:,)?\s\d{4})\b/gi;
+      let match;
+      while ((match = dateRegex.exec(text)) !== null) entities.DATE.push(match[0]);
+
+      // Simple Email
+      const emailRegex = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+      while ((match = emailRegex.exec(text)) !== null) entities.MISC.push(match[0]);
+
+      // Example for Persons (very basic, needs a proper list or model)
+      const personKeywords = ['Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Professor'];
+      personKeywords.forEach(pk => {
+        const personRegex = new RegExp(`\\b${pk.replace('.','\\.')}\\s+([A-Z][a-z]+(?:\\s[A-Z][a-z]+)?)\\b`, 'g');
+        while((match = personRegex.exec(text)) !== null) entities.PERSON.push(match[0]);
+      });
+      // Capitalized words as potential entities (crude)
+      const capWordsRegex = /\b[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}\b/g; // one to three capitalized words
+      while((match = capWordsRegex.exec(text)) !== null) {
+        const potentialEntity = match[0];
+        // Avoid adding already found dates or persons
+        if (!entities.DATE.includes(potentialEntity) && !entities.PERSON.some(p=>p.includes(potentialEntity))) {
+          // This is very naive, would need more context. For now, put in MISC or ORG if it ends with Corp, Inc etc.
+          if (/\b(Inc|Ltd|Corp|LLC|Co)\b/i.test(potentialEntity)) entities.ORG.push(potentialEntity);
+          else entities.MISC.push(potentialEntity);
+        }
+      }
+      // Deduplicate
+      for (const type in entities) {
+        entities[type] = [...new Set(entities[type])];
+      }
+      return entities;
+    },
+    renderEntityChart: (entitiesMap) => {
+      if (state.entityChartInstance) {
+        state.entityChartInstance.destroy();
+      }
+      const labels = [];
+      const dataCounts = [];
+      const backgroundColors = [];
+      const borderColors = [];
+
+      const colorMapping = {
+        PERSON: 'rgba(76, 175, 80, 0.7)', ORG: 'rgba(33, 150, 243, 0.7)',
+        DATE: 'rgba(255, 152, 0, 0.7)', LOC: 'rgba(123, 31, 162, 0.7)',
+        MISC: 'rgba(96, 125, 139, 0.7)'
+      };
+
+      for (const type in entitiesMap) {
+        if (entitiesMap[type].length > 0) {
+          labels.push(type.toUpperCase());
+          dataCounts.push(entitiesMap[type].length);
+          backgroundColors.push(colorMapping[type] || 'rgba(150, 150, 150, 0.7)');
+          borderColors.push((colorMapping[type] || 'rgba(150,150,150,1)').replace('0.7', '1'));
+        }
+      }
+
+      if (labels.length === 0) {
+        elements.entityChartCanvas.getContext('2d').clearRect(0,0,elements.entityChartCanvas.width, elements.entityChartCanvas.height); // Clear if no data
+        return;
+      }
+      const isDark = state.darkMode;
+      state.entityChartInstance = new Chart(elements.entityChartCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Entity Counts',
+            data: dataCounts,
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y', // Horizontal bars
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { color: isDark ? '#ccc' : '#333', stepSize: 1 },
+              grid: { color: isDark ? '#444' : '#eee'}
+            },
+            y: {
+              ticks: { color: isDark ? '#ccc' : '#333' },
+              grid: { display: false }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'Named Entity Distribution', color: isDark ? '#eee' : '#333' }
+          }
+        }
+      });
+    },
+    calculateInsights: (text) => {
+      const insights = {};
+      const words = utils.getWords(text, false); // Get all words for stats
+      const sentences = utils.getSentences(text);
+
+      // Readability (Flesch Reading Ease)
+      // Formula: 206.835 - 1.015 * (total_words / total_sentences) - 84.6 * (total_syllables / total_words)
+      // Syllable counting is complex, so we'll use a very rough approximation or a simpler metric.
+      // For demo, let's use average words per sentence as a proxy or a simplified Flesch.
+      if (sentences.length > 0 && words.length > 0) {
+        const avgWordsPerSentence = words.length / sentences.length;
+        // Simplified score (not real Flesch, but gives a number)
+        let readabilityScore = 90 - (avgWordsPerSentence * 2);
+        readabilityScore = Math.max(0, Math.min(100, readabilityScore)); // Clamp
+        let level = "Easy";
+        if (readabilityScore < 30) level = "Very Difficult";
+        else if (readabilityScore < 50) level = "Difficult";
+        else if (readabilityScore < 70) level = "Fairly Easy";
+        insights.readability = { score: readabilityScore, level: level };
+        insights.stats = { wordCount: words.length, sentenceCount: sentences.length, avgWordsPerSentence };
+      }
+
+      // Sentiment Analysis (simple lexicon-based)
+      const contentWords = utils.getWords(text, true);
+      let positiveScore = 0;
+      let negativeScore = 0;
+      contentWords.forEach(word => {
+        if (state.sentimentLexicon.positive.has(word)) positiveScore++;
+        if (state.sentimentLexicon.negative.has(word)) negativeScore++;
+      });
+      let sentimentLabel = "Neutral";
+      // Normalize score: (pos - neg) / (pos + neg + epsilon) -- range -1 to 1
+      // Or simpler: pos / (pos + neg + epsilon) -- range 0 to 1
+      let overallSentimentScore = 0.5;
+      if (positiveScore + negativeScore > 0) {
+        overallSentimentScore = positiveScore / (positiveScore + negativeScore);
+      }
+
+      if (overallSentimentScore > 0.6) sentimentLabel = "Positive";
+      else if (overallSentimentScore < 0.4) sentimentLabel = "Negative";
+      insights.sentiment = { score: overallSentimentScore, label: sentimentLabel, positiveCount: positiveScore, negativeCount: negativeScore };
+
+      // Top Keywords (already done in extractKeyConcepts, can reuse)
+      insights.topKeywords = ai.extractKeyConcepts(text, 5);
+
+      return insights;
+    },
+    searchInDocument: (term) => {
+      state.currentSearchTerm = term.trim();
+      if (!state.currentDocumentText || !state.currentSearchTerm) {
+        ui.displaySearchResults([]);
+        return;
+      }
+      const results = [];
+      const regex = new RegExp(state.currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); // Escape regex special chars
+      let match;
+      const contextChars = 30; // Characters before and after match
+
+      while ((match = regex.exec(state.currentDocumentText)) !== null) {
+        const startIndex = match.index;
+        const endIndex = regex.lastIndex;
+        const before = state.currentDocumentText.substring(Math.max(0, startIndex - contextChars), startIndex);
+        const after = state.currentDocumentText.substring(endIndex, Math.min(state.currentDocumentText.length, endIndex + contextChars));
+
+        results.push({
+          startIndex,
+          endIndex,
+          context: `${before.length === contextChars ? '...' : ''}${before}<mark>${match[0]}</mark>${after}${after.length === contextChars ? '...' : ''}`
+        });
+      }
+      ui.displaySearchResults(results);
+    }
+  };
+
+  // --- Event Handlers ---
+  const handlers = {
+    initApp: async () => {
+      ui.updateProgressBar(10); // Initial
+      // Apply theme
+      if (state.darkMode) {
+        document.body.classList.add('dark-theme');
+        elements.themeToggleBtn.textContent = '☀️';
+      }
+      ui.updateProgressBar(30);
+      // Load history
+      const storedHistory = localStorage.getItem('docAnalyzerHistory');
+      if (storedHistory) state.history = JSON.parse(storedHistory);
+      ui.renderHistory();
+      ui.updateProgressBar(60);
+
+      // "Simulate" model loading or setup
+      // In a real TF.js app, this is where you'd load models: await tf.loadLayersModel(...)
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+      state.isModelLoaded = true;
+      ui.updateProgressBar(100);
+
+      setTimeout(() => {
+        elements.loadingScreen.style.display = 'none';
+        elements.appContainer.style.display = 'grid';
+      }, 300);
+
+      // Setup event listeners
+      elements.themeToggleBtn.addEventListener('click', ui.toggleTheme);
+      elements.documentInput.addEventListener('input', utils.debounce(ui.updateWordCount, 200));
+      elements.analyzeBtn.addEventListener('click', handlers.analyzeDocument);
+      elements.clearBtn.addEventListener('click', handlers.clearAllInput);
+
+      // Settings
+      elements.summaryLengthSlider.addEventListener('input', (e) => elements.summaryLengthValue.textContent = `${e.target.value}%`);
+      elements.keyConceptsSlider.addEventListener('input', (e) => elements.keyConceptsValue.textContent = e.target.value);
+
+      // Tabs
+      elements.inputTabsContainer.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => ui.switchTab(elements.inputTabsContainer, 'tab-content', tab));
+      });
+      elements.outputTabsContainer.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => ui.switchTab(elements.outputTabsContainer, 'tab-content', tab));
+      });
+
+      // File Upload
+      elements.fileDropArea.addEventListener('click', () => elements.fileInput.click());
+      elements.fileDropArea.addEventListener('dragover', handlers.handleDragOver);
+      elements.fileDropArea.addEventListener('dragleave', handlers.handleDragLeave);
+      elements.fileDropArea.addEventListener('drop', handlers.handleFileDrop);
+      elements.fileInput.addEventListener('change', handlers.handleFileSelect);
+
+      // Actions
+      elements.copySummaryBtn.addEventListener('click', handlers.copySummary);
+      elements.downloadSummaryBtn.addEventListener('click', handlers.downloadSummary);
+      elements.exportResultsBtn.addEventListener('click', handlers.exportAllResults);
+
+      // Search
+      elements.searchInput.addEventListener('input', utils.debounce(() => ai.searchInDocument(elements.searchInput.value), 300));
+      elements.searchIcon.addEventListener('click', () => ai.searchInDocument(elements.searchInput.value));
+      elements.prevMatchBtn.addEventListener('click', () => ui.navigateToMatch(state.currentMatchIndex - 1));
+      elements.nextMatchBtn.addEventListener('click', () => ui.navigateToMatch(state.currentMatchIndex + 1));
+
+      // History
+      elements.clearHistoryBtn.addEventListener('click', handlers.clearHistory);
+    },
+    analyzeDocument: async () => {
+      if (state.isProcessing) return;
+      state.currentDocumentText = elements.documentInput.value.trim();
+      if (!state.currentDocumentText) {
+        utils.showToast("Please enter some text or upload a document.", "error");
+        return;
+      }
+      ui.showLoading(true);
+      ui.resetOutputs(); // Clear previous results before new analysis
+
+      try {
+        // --- 1. Summarization ---
+        const summaryLengthPercentage = parseInt(elements.summaryLengthSlider.value) / 100;
+        const summaryType = elements.summaryTypeSelect.value;
+        let summary = "";
+        if (summaryType === 'extractive') {
+          summary = ai.extractiveSummarize(state.currentDocumentText, summaryLengthPercentage);
+        } else if (summaryType === 'abstractive_simplified') {
+          summary = ai.abstractiveSimplifiedSummarize(state.currentDocumentText, summaryLengthPercentage);
+        } else if (summaryType === 'bullet_points') {
+          const numBullets = Math.max(3, Math.ceil(utils.getSentences(state.currentDocumentText).length * summaryLengthPercentage * 0.5)); // Heuristic
+          summary = ai.bulletPointSummarize(state.currentDocumentText, numBullets);
+        }
+        state.analysisResults.summary = summary;
+        ui.displaySummary(summary);
+
+        // --- 2. Key Concepts ---
+        const numKeyConcepts = parseInt(elements.keyConceptsSlider.value);
+        const concepts = ai.extractKeyConcepts(state.currentDocumentText, numKeyConcepts);
+        state.analysisResults.keyConcepts = concepts;
+        ui.displayKeyConcepts(concepts);
+
+        // --- 3. Named Entities (if checked) ---
+        if (elements.extractEntitiesCheckbox.checked) {
+          const entities = ai.extractEntities(state.currentDocumentText);
+          state.analysisResults.entities = entities;
+          ui.displayEntities(entities);
+          ai.renderEntityChart(entities); // Render chart
+        } else {
+          state.analysisResults.entities = {}; ui.displayEntities({}); ai.renderEntityChart({});
+        }
+
+        // --- 4. Insights (if checked) ---
+        if (elements.calculateInsightsCheckbox.checked) {
+          const insights = ai.calculateInsights(state.currentDocumentText);
+          state.analysisResults.insights = insights;
+          ui.displayInsights(insights);
+        } else {
+          state.analysisResults.insights = {}; ui.displayInsights({});
+        }
+
+        handlers.saveToHistory(state.currentDocumentText, state.currentFileName);
+        elements.exportResultsBtn.classList.remove('hide');
+        utils.showToast("Analysis complete!", "success");
+
+      } catch (error) {
+        console.error("Analysis error:", error);
+        utils.showToast("An error occurred during analysis.", "error");
+      } finally {
+        ui.showLoading(false);
+      }
+    },
+    clearAllInput: () => {
+      elements.documentInput.value = '';
+      ui.updateWordCount();
+      state.currentDocumentText = null;
+      state.currentFileName = null;
+      elements.uploadList.innerHTML = ''; // Clear file list
+      elements.fileInput.value = ''; // Reset file input
+      ui.resetOutputs();
+      utils.showToast("Input cleared.", "info");
+    },
+    handleDragOver: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      elements.fileDropArea.classList.add('drag-over');
+    },
+    handleDragLeave: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      elements.fileDropArea.classList.remove('drag-over');
+    },
+    handleFileDrop: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      elements.fileDropArea.classList.remove('drag-over');
+      const files = event.dataTransfer.files;
+      if (files.length > 0) {
+        handlers.processFiles(files);
+      }
+    },
+    handleFileSelect: (event) => {
+      const files = event.target.files;
+      if (files.length > 0) {
+        handlers.processFiles(files);
+      }
+    },
+    processFiles: async (files) => {
+      ui.showLoading(true, "Reading file(s)...");
+      elements.uploadList.innerHTML = ''; // Clear previous list
+      let combinedText = "";
+      let firstFileName = files.length > 0 ? files[0].name : "Uploaded Document";
+
+      for (const file of files) {
+        ui.updateFileUploadList([file]); // Show current file being processed
+        try {
+          const text = await handlers.readFileAsText(file);
+          combinedText += text + "\n\n"; // Add separator for multiple files
+        } catch (error) {
+          console.error("Error reading file:", file.name, error);
+          utils.showToast(`Error reading ${file.name}: ${error.message}`, "error");
+        }
+      }
+      elements.documentInput.value = combinedText.trim();
+      state.currentFileName = files.length === 1 ? files[0].name : "Multiple Files";
+      ui.updateWordCount();
+      utils.showToast(`${files.length} file(s) processed.`, "success");
+      ui.showLoading(false);
+      // Optionally, auto-analyze after upload
+      // if (combinedText.trim()) handlers.analyzeDocument();
+    },
+    readFileAsText: (file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error("File could not be read."));
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'txt') {
+          reader.readAsText(file);
+        } else if (ext === 'csv') {
+          Papa.parse(file, {
+            complete: (results) => {
+              // Combine all cell data into a single string
+              const textContent = results.data.map(row => row.join(' ')).join('\n');
+              resolve(textContent);
+            },
+            error: (err) => reject(new Error(`CSV parsing error: ${err.message}`))
+          });
+        } else if (ext === 'xlsx' || ext === 'xls') {
+          reader.onload = (e) => {
+            try {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, {type: 'array'});
+              let textContent = '';
+              workbook.SheetNames.forEach(sheetName => {
+                const worksheet = workbook.Sheets[sheetName];
+                textContent += XLSX.utils.sheet_to_txt(worksheet, {FS: ' ', RS: '\n'}) + '\n';
+              });
+              resolve(textContent.trim());
+            } catch (err) {
+              reject(new Error(`Excel parsing error: ${err.message}`));
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        } else if (ext === 'html' || ext === 'htm') {
+          reader.onload = (e) => {
+            try {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(e.target.result, "text/html");
+              resolve(doc.body.textContent || "");
+            } catch (err) {
+              reject(new Error(`HTML parsing error: ${err.message}`));
+            }
+          };
+          reader.readAsText(file);
+        }
+        /* PDF.js integration example (if PDF.js is added to <head>)
+        else if (ext === 'pdf') {
+            if (typeof pdfjsLib === 'undefined') {
+                return reject(new Error("PDF.js library not loaded. Cannot process PDF files."));
+            }
+            reader.onload = async (e) => {
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument({data: typedarray}).promise;
+                    let textContent = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContentPage = await page.getTextContent();
+                        textContent += textContentPage.items.map(item => item.str).join(' ') + '\n';
+                    }
+                    resolve(textContent.trim());
+                } catch (err) {
+                    console.error("PDF processing error", err);
+                    reject(new Error(`PDF processing error: ${err.message || err}`));
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } */
+        else {
+          reject(new Error(`Unsupported file type: .${ext}`));
+        }
+      });
+    },
+    copySummary: () => {
+      if (state.analysisResults.summary) {
+        navigator.clipboard.writeText(state.analysisResults.summary)
+                .then(() => utils.showToast("Summary copied to clipboard!", "success"))
+                .catch(err => {
+                  console.error('Failed to copy: ', err);
+                  utils.showToast("Failed to copy summary.", "error");
+                });
+      }
+    },
+    downloadSummary: () => {
+      if (state.analysisResults.summary) {
+        const blob = new Blob([state.analysisResults.summary], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${state.currentFileName || 'summary'}_summary.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        utils.showToast("Summary download started.", "success");
+      }
+    },
+    exportAllResults: () => {
+      let reportText = `AI Document Analysis Report\n`;
+      reportText += `Document: ${state.currentFileName || (state.currentDocumentText.substring(0,30) + '...')}\n`;
+      reportText += `Date: ${new Date().toLocaleString()}\n\n`;
+
+      reportText += `--- SUMMARY ---\n${state.analysisResults.summary || 'N/A'}\n\n`;
+
+      reportText += `--- KEY CONCEPTS ---\n${(state.analysisResults.keyConcepts || []).join(', ') || 'N/A'}\n\n`;
+
+      if (state.analysisResults.entities && Object.keys(state.analysisResults.entities).length > 0) {
+        reportText += `--- NAMED ENTITIES ---\n`;
+        for (const type in state.analysisResults.entities) {
+          if (state.analysisResults.entities[type].length > 0) {
+            reportText += `${type.toUpperCase()}: ${state.analysisResults.entities[type].join(', ')}\n`;
+          }
+        }
+        reportText += '\n';
+      }
+
+      if (state.analysisResults.insights) {
+        reportText += `--- INSIGHTS ---\n`;
+        if(state.analysisResults.insights.readability) reportText += `Readability: ${state.analysisResults.insights.readability.score.toFixed(1)} (${state.analysisResults.insights.readability.level})\n`;
+        if(state.analysisResults.insights.sentiment) reportText += `Sentiment: ${state.analysisResults.insights.sentiment.label} (Score: ${state.analysisResults.insights.sentiment.score.toFixed(2)})\n`;
+        if(state.analysisResults.insights.stats) reportText += `Stats: ${state.analysisResults.insights.stats.wordCount} words, ${state.analysisResults.insights.stats.sentenceCount} sentences\n`;
+      }
+
+      const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.currentFileName || 'analysis'}_report.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      utils.showToast("Full report download started.", "success");
+    },
+
+    saveToHistory: (text, fileName) => {
+      const historyItem = {
+        text: text,
+        name: fileName || (text.length > 30 ? text.substring(0, 30) + '...' : text) || "Pasted Text",
+        timestamp: Date.now(),
+        // Could store analysisResults here too if needed for quick reload without re-analysis
+      };
+      state.history.unshift(historyItem); // Add to beginning
+      if (state.history.length > 10) state.history.pop(); // Max 10 items
+      localStorage.setItem('docAnalyzerHistory', JSON.stringify(state.history));
+      ui.renderHistory();
+    },
+    loadFromHistory: (index) => {
+      const item = state.history[index];
+      if (item) {
+        elements.documentInput.value = item.text;
+        state.currentFileName = item.name;
+        ui.updateWordCount();
+        utils.showToast(`Loaded "${item.name}" from history.`, "info");
+        // Optionally, re-analyze or load stored results if saved
+        handlers.analyzeDocument();
+        // Switch to text input tab if not active
+        const textInputTabButton = elements.inputTabsContainer.querySelector('[data-tab="text-input-content"]');
+        if (textInputTabButton && !textInputTabButton.classList.contains('active')) {
+          ui.switchTab(elements.inputTabsContainer, 'tab-content', textInputTabButton);
+        }
+      }
+    },
+    clearHistory: () => {
+      if (confirm("Are you sure you want to clear all history?")) {
+        state.history = [];
+        localStorage.removeItem('docAnalyzerHistory');
+        ui.renderHistory();
+        utils.showToast("History cleared.", "info");
+      }
+    }
+  };
+
+  // --- Initialize ---
+  document.addEventListener('DOMContentLoaded', handlers.initApp);
+
+</script>
+</body>
+</html>
