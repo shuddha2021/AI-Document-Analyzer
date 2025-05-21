@@ -4,9 +4,11 @@
 
 This tool serves as an impressive demonstration of what can be achieved with modern web technologies for NLP tasks, data parsing, and visualization, all within a single-file architecture.
 
-<img width="955" alt="AI Document Analyzer Screenshot 1" src="https://via.placeholder.com/955x600.png?text=App+Screenshot+1+-+Input+and+Settings">
-<!-- TODO: Replace with actual screenshots of your application -->
-<img width="955" alt="AI Document Analyzer Screenshot 2" src="https://via.placeholder.com/955x600.png?text=App+Screenshot+2+-+Summary+and+Analysis">
+<img width="1443" alt="Screenshot 2025-05-21 at 9 31 40 AM" src="https://github.com/user-attachments/assets/7ea079c6-f10a-4542-98a5-e0f3ac1429c5" />
+<br/>
+<img width="1443" alt="Screenshot 2025-05-21 at 9 31 48 AM" src="https://github.com/user-attachments/assets/de29c64e-8755-425b-aa29-a07e28332f76" />
+
+
 
 ## 🚀 Features
 
@@ -97,9 +99,10 @@ This approach allows for a feature-rich experience entirely within the browser, 
 <!-- Add more screenshots here -->
 *Awaiting actual application screenshots. Placeholder images are currently used.*
 
-<img width="955" alt="AI Document Analyzer Screenshot - File Upload" src="https://via.placeholder.com/955x400.png?text=File+Upload+Interface">
+<img width="1443" alt="Screenshot 2025-05-21 at 9 33 08 AM" src="https://github.com/user-attachments/assets/213a4934-6205-4c0d-a375-33baaa2c4012" />
 <br/>
-<img width="955" alt="AI Document Analyzer Screenshot - Entity Chart" src="https://via.placeholder.com/955x400.png?text=Entity+Distribution+Chart">
+<img width="1443" alt="Screenshot 2025-05-21 at 9 33 18 AM" src="https://github.com/user-attachments/assets/e2d8c3c6-79f0-455e-86e8-2c0b957f9e96" />
+
 
 ## 🔮 Future Enhancements
 
