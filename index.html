@@ -1065,12 +1065,33 @@
       }
     },
     renderHistory: () => {
-      elements.historyContainer.innerHTML = ''; // Clear
+      // Preserve the "no history" placeholder element so it can be toggled on/off.
+      const container = elements.historyContainer;
+      const placeholder = elements.noHistoryMsg;
+
+      // Ensure the placeholder remains attached to the container even after re-renders.
+      if (placeholder && placeholder.parentElement !== container) {
+        container.appendChild(placeholder);
+      }
+
+      // Remove previously rendered history entries while keeping the placeholder intact.
+      Array.from(container.children).forEach(child => {
+        if (child !== placeholder) {
+          container.removeChild(child);
+        }
+      });
+
       if (state.history.length === 0) {
-        elements.noHistoryMsg.classList.remove('hide');
+        if (placeholder) {
+          placeholder.classList.remove('hide');
+        }
         return;
       }
-      elements.noHistoryMsg.classList.add('hide');
+
+      if (placeholder) {
+        placeholder.classList.add('hide');
+      }
+
       const ul = document.createElement('ul');
       ul.style.listStyleType = 'none';
       ul.style.paddingLeft = '0';
@@ -1087,7 +1108,7 @@
         li.onclick = () => handlers.loadFromHistory(index);
         ul.appendChild(li);
       });
-      elements.historyContainer.appendChild(ul);
+      container.appendChild(ul);
     },
     updateFileUploadList: (files) => {
       elements.uploadList.innerHTML = '';
